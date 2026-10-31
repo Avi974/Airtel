@@ -4,7 +4,7 @@ Pydantic v2 schemas for typed API request/response payloads.
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ============================================================================
@@ -21,15 +21,14 @@ class SessionIdentify(BaseModel):
 
 
 class SessionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     session_id: str
     preferred_language: str
     contact_phone: Optional[str] = None
     business_name: Optional[str] = None
     resume_token: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class MagicLinkRequest(BaseModel):
@@ -105,6 +104,8 @@ class BundleRecommendation(BaseModel):
 # ============================================================================
 
 class ProductResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     product_id: str
     name: str
     category: str
@@ -121,9 +122,6 @@ class ProductResponse(BaseModel):
     incompatible_with: List[str]
     sla_install_days: int
     description: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class ServiceabilityRequest(BaseModel):
@@ -227,14 +225,13 @@ class ConsentGrantRequest(BaseModel):
 
 
 class ConsentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     consent_id: str
     session_id: str
     purpose_scope: str
     is_active: bool
     granted_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ConsentWithdrawalResult(BaseModel):
