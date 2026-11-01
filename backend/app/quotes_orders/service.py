@@ -311,3 +311,84 @@ def accept_quote(db: Session, quote_id: str) -> Order:
     db.commit()
     db.refresh(order)
     return order
+
+def get_quote_response(db: Session, quote_id: str):
+    from app.models.schemas import QuoteResponse, QuoteLineItemSchema
+
+    quote = db.query(Quote).filter(Quote.quote_id == quote_id).first()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found.")
+
+    items_schemas = []
+    for it in quote.line_items:
+        p = db.query(Product).filter(Product.product_id == it.product_id).first()
+        p_name = p.name if p else it.product_id
+        p_cat = p.category if p else "Connectivity"
+        sla = p.sla_install_days if p else 3
+
+        monthly_base_inr = (it.unit_monthly_paise * it.quantity) / 100.0
+        cgst_inr = it.cgst_paise / 100.0
+        sgst_inr = it.sgst_paise / 100.0
+        igst_inr = it.igst_paise / 100.0
+
+        items_schemas.append(
+            QuoteLineItemSchema(
+                line_item_id=it.line_item_id,
+                product_id=it.product_id,
+                product_name=p_name,
+                category=p_cat,
+                site_identifier=it.site_identifier,
+                site_pincode=it.site_pincode,
+                site_state_code=it.site_state_code,
+                serviceability_status=it.serviceability_status,
+                quantity=it.quantity,
+                contract_months=it.contract_months,
+                unit_monthly_inr=it.unit_monthly_paise / 100.0,
+                unit_setup_inr=it.unit_setup_paise / 100.0,
+                cgst_inr=cgst_inr,
+                sgst_inr=sgst_inr,
+                igst_inr=igst_inr,
+                total_monthly_inr=monthly_base_inr + cgst_inr + sgst_inr + igst_inr,
+                sla_install_days=sla,
+            )
+        )
+
+    return QuoteResponse(
+        quote_id=quote.quote_id,
+        session_id=quote.session_id or "",
+        status=quote.status,
+        line_items=items_schemas,
+        monthly_subtotal_inr=quote.monthly_subtotal_paise / 100.0,
+        monthly_cgst_inr=quote.monthly_cgst_paise / 100.0,
+        monthly_sgst_inr=quote.monthly_sgst_paise / 100.0,
+        monthly_igst_inr=quote.monthly_igst_paise / 100.0,
+        monthly_total_inr=quote.monthly_total_paise / 100.0,
+        one_time_subtotal_inr=quote.one_time_subtotal_paise / 100.0,
+        one_time_cgst_inr=quote.one_time_cgst_paise / 100.0,
+        one_time_sgst_inr=quote.one_time_sgst_paise / 100.0,
+        one_time_igst_inr=quote.one_time_igst_paise / 100.0,
+        one_time_total_inr=quote.one_time_total_paise / 100.0,
+        pricing_formula_ver=quote.pricing_formula_ver,
+        expires_at=quote.expires_at,
+    )
+
+
+modify_quote_items = patch_quote_items
+
+
+def accept_quote_and_create_order(db: Session, quote_id: str, idempotency_key: Optional[str] = None):
+    from app.models.schemas import OrderAcceptanceResponse
+
+    order = accept_quote(db, quote_id)
+    quote = order.quote
+
+    return OrderAcceptanceResponse(
+        order_id=order.order_id,
+        quote_id=order.quote_id,
+        session_id=order.session_id or "",
+        status=order.status,
+        monthly_total_inr=quote.monthly_total_paise / 100.0,
+        one_time_total_inr=quote.one_time_total_paise / 100.0,
+        created_at=order.created_at,
+        next_step="GRANT_CONSENT_AND_UPLOAD_DOCUMENTS",
+    )
